@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # init DB
 init_db()
 
+scheduler = AsyncIOScheduler()
+
 # scheduled job: daily summary for each user who has trades
 from db import SessionLocal
 
@@ -59,26 +61,60 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Trading Journal Bot online. Use /log to log a trade, /list to list recent trades, /export to get CSV, /stats for quick metrics.")
 
+async def on_startup(app):
+    scheduler.start()
+
+# def main():
+#     if not TOKEN:
+#         raise RuntimeError("TELEGRAM_TOKEN missing in env")
+#     # app = ApplicationBuilder().token(TOKEN).build()
+#     app = ApplicationBuilder().token(TOKEN).post_init(on_startup).build()
+
+
+#     # register handlers
+#     app.add_handler(get_trade_conversation())
+#     app.add_handler(CommandHandler("start", start_command))
+#     app.add_handler(CommandHandler("list", list_trades))
+#     app.add_handler(CommandHandler("stats", stats_command))
+#     app.add_handler(CommandHandler("export", export_command))
+
+#     # scheduler
+#     scheduler = AsyncIOScheduler(timezone=TZ)
+#     # run daily at DAILY_HOUR
+#     # scheduler.add_job(lambda: asyncio.create_task(send_daily_summary(app)), 'cron', hour=DAILY_HOUR)
+#     scheduler.add_job(lambda: asyncio.create_task(send_daily_summary(app)), 'cron', hour=DAILY_HOUR)
+#     scheduler.start()
+
+#     # run polling
+#     app.run_polling()
+
+
 def main():
     if not TOKEN:
         raise RuntimeError("TELEGRAM_TOKEN missing in env")
-    app = ApplicationBuilder().token(TOKEN).build()
 
-    # register handlers
+    async def on_startup(app):
+        scheduler.start()
+
+    app = ApplicationBuilder().token(TOKEN).post_init(on_startup).build()
+
+    # register conversation and commands
     app.add_handler(get_trade_conversation())
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("list", list_trades))
     app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("export", export_command))
 
-    # scheduler
-    scheduler = AsyncIOScheduler(timezone=TZ)
-    # run daily at DAILY_HOUR
-    scheduler.add_job(lambda: asyncio.create_task(send_daily_summary(app)), 'cron', hour=DAILY_HOUR)
-    scheduler.start()
+    # scheduler is declared BEFORE run_polling, but starts AFTER.
+    scheduler.add_job(
+        lambda: asyncio.create_task(send_daily_summary(app)),
+        'cron',
+        hour=DAILY_HOUR
+    )
 
-    # run polling
     app.run_polling()
+
+
 
 if __name__ == "__main__":
     main()
