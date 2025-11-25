@@ -1,0 +1,5 @@
+python-telegram-bot>=20.4
+python-dotenv>=1.0.0
+SQLAlchemy>=1.4
+APScheduler>=3.9
+pandas>=2.0
